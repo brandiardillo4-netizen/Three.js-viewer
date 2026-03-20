@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OBJ Viewer + Destroy</title>
+</head>
+<body style="margin:0">
+
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { OBJLoader } from 'https://unpkg.com/three@0.160.0/examples/jsm/loaders/OBJLoader.js';
+import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111111);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(3, 2, 5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+let modelRoot = null;
+let parts = [];
+
+// LOAD YOUR OBJ
+const loader = new OBJLoader();
+loader.load('WMEG2000_TCF_1994_Packs.obj', (object) => {
+
+    modelRoot = object;
+
+    // center model
+    const box = new THREE.Box3().setFromObject(object);
+    const center = box.getCenter(new THREE.Vector3());
+    object.position.sub(center);
+
+    object.traverse((child) => {
+        if (child.isMesh) {
+            child.material = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
+            parts.push(child);
+        }
+    });
+
+    scene.add(object);
+});
+
+// destroy system
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function destroyAt(event) {
+    if (!modelRoot) return;
+
+    mouse.x = (event.clientX / innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const hits = raycaster.intersectObjects(parts, true);
+    if (!hits.length) return;
+
+    const hitPoint = hits[0].point;
+
+    parts.forEach(mesh => {
+        const d = mesh.getWorldPosition(new THREE.Vector3()).distanceTo(hitPoint);
+        if (d < 2.0) {
+            mesh.visible = false;
+        }
+    });
+}
+
+window.addEventListener('pointerdown', destroyAt);
+
+// resize
+window.addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+});
+
+// animation loop
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+</script>
+
+</body>
+</html>
